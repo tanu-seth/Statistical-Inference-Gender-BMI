@@ -1,0 +1,110 @@
+---
+title: "R Notebook"
+output:
+  word_document: default
+  html_notebook: default
+---
+
+```{r}
+data <- read.csv("./Gender_Height_Weight_Index.csv")
+data<-data.frame(data)
+head(data,5)
+
+```
+
+
+```{r}
+bmi <- data$BMI
+bmi.ecdf<-ecdf(bmi)
+plot(bmi.ecdf)
+```
+```{r}
+bmi.ecdf(100)-bmi.ecdf(25)
+```
+
+
+##80 percent of the people in this dataset is overweight or obese
+
+```{r}
+n<-length(bmi)
+B=3000
+library(bootstrap)
+median.boot<-bootstrap(bmi,B,median)
+hist(median.boot$thetastar)
+```
+
+
+```{r}
+se_boot <- var(median.boot$thetastar)
+theta_hat <- median(bmi)
+```
+#Confidence Intervals:
+1)Normal
+
+```{r}
+normal.ci<-c(theta_hat-2*se_boot,theta_hat+2*se_boot)
+normal.ci
+```
+2) Pivotal CI
+```{r}
+pivotal.ci<-c(2*theta_hat - quantile(median.boot$thetastar,0.975),2*theta_hat - quantile(median.boot$thetastar,0.0275))
+pivotal.ci
+```
+3) Quantile CI
+```{r}
+quantile.ci<-quantile(median.boot$thetastar,c(0.025,0.975))
+quantile.ci
+```
+
+Now there are two gender informations here. We want to calculate the mean bmi of each gender and want to know if if differs for male and female. 
+#MLE of mu1 minus mu2
+```{r}
+male_bmi <- data[which(data$Gender=='Male'),"BMI"]
+female_bmi <- data[which(data$Gender=='Female'),"BMI"]
+```
+```{r}
+mu1<-mean(male_bmi) #male bmi mean
+mu2<-mean(female_bmi) #female bmi mean
+mudiff_hat <- mu1-mu2
+mudiff_hat
+```
+#Paramteric bootstrap to calculate CI for mu1-mu2
+```{r}
+var1<-var(male_bmi)
+var2<-var(female_bmi)
+sd1<-sqrt(var1)
+sd2<-sqrt(var2)
+n_male <- length(male_bmi)
+n_female <- length(female_bmi)
+
+mu_diff_par<-c()
+for (i in 1:1000){
+  x <- rnorm(n_male,mu1,sd1)
+  y <- rnorm(n_female,mu2,sd2)
+  mu_diff_par[i]<-mean(x)-mean(y)
+}
+
+mu_diff_par.mean <- mean(mu_diff_par)
+mu_diff_par.sd<-sd(mu_diff_par)
+CI<-c(mu_diff_par.mean-1.96*mu_diff_par.sd, mu_diff_par.mean+1.96*mu_diff_par.sd)
+CI
+```
+```{r}
+hist(mu_diff_par)
+```
+
+```{r}
+z <- mudiff_hat - 0/(sqrt((var1+var2)/n_male+n_female))
+p_value <- 2*(1-pnorm(z))
+p_value
+```
+
+we cannot reject the null hypothesis which means bmi of the two populations are equal.
+
+Considering flat prior for the mean difference we generate posterior of mu1-mu2
+```{r}
+mu_diff_var <- var1+var2
+posterior_mudiff<-rnorm(n_male+n_female,mudiff_hat,sqrt(mu_diff_var/(n_male+n_female)))
+hist(posterior_mudiff)
+```
+
